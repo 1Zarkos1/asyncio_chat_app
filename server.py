@@ -5,7 +5,7 @@ connected_clients = 0
 
 async def handle_connection(reader, writer):
     client = writer.get_extra_info('peername')
-    log_action('connected to', client)
+    await log_action('connected to', client)
     try:
         while True:
             message = await reader.read(50)
@@ -15,11 +15,12 @@ async def handle_connection(reader, writer):
                 break
     except ConnectionResetError as e:
         print(f'Connection to {client} was lost')
-    log_action('left', client)
+    await log_action('left', client)
     writer.close()
     await writer.wait_closed()
 
 async def log_action(action, client):
+    global connected_clients
     message = f"Client {client} {action} the server"
     if action == 'connected to':
         connected_clients += 1 
