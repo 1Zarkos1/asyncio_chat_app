@@ -1,5 +1,7 @@
 import asyncio
 
+DEFAULT_SERVER_ADDRESS = ('127.0.0.52', 5200)
+
 connected_clients = {}
 
 async def handle_connection(reader, writer):
@@ -28,15 +30,16 @@ async def log_action(action, client, writer):
     print(f"Members online: {len(connected_clients)}")
 
 async def distribute_message(sender, message, receivers):
-    message = f'{sender} send: {message}'
+    message = f'{sender} send: >>> {message}'
     print(message)
     for receiver in receivers:
         receiver.write(message.encode('utf-8'))
         await receiver.drain()
 
 async def server_work():
-    server = await asyncio.start_server(handle_connection, '127.0.0.52', 5200)
+    server = await asyncio.start_server(handle_connection, *DEFAULT_SERVER_ADDRESS)
     async with server:
         await server.serve_forever()
 
-asyncio.run(server_work())
+if __name__ == "__main__":
+    asyncio.run(server_work())
