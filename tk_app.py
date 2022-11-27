@@ -2,8 +2,6 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import threading
 
-class AppClosedException(Exception):
-    ...
 
 def gui(inbox, out_queue):
     root = tk.Tk()
@@ -11,7 +9,6 @@ def gui(inbox, out_queue):
 
     def on_close():
         root.destroy()
-        raise AppClosedException
 
     root.protocol("WM_DELETE_WINDOW", on_close)
 

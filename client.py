@@ -10,27 +10,48 @@ message_queue = asyncio.Queue()
 gui_inbox = Queue()
 gui_outqueue = Queue()
 
+run_flag = 1
+exit_obj = object()
+
 async def get_message_from_gui():
-    while True:
+    while run_flag:
         message = await asyncio.to_thread(gui_outqueue.get)
-        await message_queue.put(message)
-        await asyncio.sleep(0.1)
+        if message != exit_obj:
+            await message_queue.put(message)
+            await asyncio.sleep(0.1)
 
 async def send_message(writer):
-    while True:
+    while run_flag:
         message = await message_queue.get()
         message_queue.task_done()
         writer.write(message.encode('utf-8'))
         await writer.drain()
 
 async def receive_message(reader):
-    while True:
+    while run_flag:
         message = await reader.read(50)
+        print(message)
         if message := message.decode('utf-8'):
             gui_inbox.put(message)
         else:
             print('disconnecting from server')
             break
+
+async def shut_down(tasks, writer):
+    global run_flag
+    run_flag = 0
+
+    gui_outqueue.put(exit_obj)
+
+    for task in tasks:
+        try:
+            task.cancel()
+            await task
+        except asyncio.CancelledError:
+            print("...")
+
+    writer.close()
+    await writer.wait_closed()
 
 async def client_connection():
     try:
@@ -39,14 +60,12 @@ async def client_connection():
         print(f"Could not connect to specified server at {server_address}")
         return
     try:
-        message_from_gui = asyncio.create_task(get_message_from_gui())
-        receive = asyncio.create_task(receive_message(reader))
-        send = asyncio.create_task(send_message(writer))
+        coros = [get_message_from_gui(), receive_message(reader), send_message(writer)]
+        background_tasks = [asyncio.create_task(coro) for coro in coros]
         gui_app = asyncio.to_thread(gui, gui_inbox, gui_outqueue)
-        await asyncio.gather(message_from_gui, receive, send, gui_app)
-    except (AppClosedException, KeyboardInterrupt):
-        print("closing connections")
-        writer.close()
-        await writer.wait_closed()
+        await gui_app
+    except KeyboardInterrupt:
+        print("keyboard interruption")
+    await shut_down(backgroun_tasks, writer)
 
 asyncio.run(client_connection())
